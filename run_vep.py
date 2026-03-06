@@ -19,6 +19,7 @@ recording_mode = True
 # duration
 stim_duration = 0.3
 interval_duration = 0.5
+jitter = 0.1
 
 # modify!!!
 session = 1
@@ -186,7 +187,6 @@ if cyton_in:
 
 # for cyton
 num_frames = np.round(stim_duration * refresh_rate).astype(int)  # total number of frames per trial
-num_wait_frames = np.round(interval_duration * refresh_rate).astype(int) # total number of frames for the wait interval
 frame_indices = np.arange(num_frames)  # frame indices for the trial
 eeg = np.zeros((8, 0))
 aux = np.zeros((3, 0))
@@ -242,6 +242,7 @@ if recording_mode:
             window.flip()
 
         photosensor_dot.color = np.array([-1, -1, -1])
+        num_wait_frames = np.round((interval_duration + random.uniform(0, jitter)) * refresh_rate).astype(int) # total number of frames for the wait interval
 
         for i_int in range(num_wait_frames):
             trial_text.draw() 
