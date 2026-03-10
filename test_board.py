@@ -4,9 +4,12 @@ import numpy as np
 from scipy import signal
 import random, os, pickle
 import mne
+import string
+import psychopy.visual
+import psychopy.event
 
 # set to True when doing actual experiment 
-cyton_in = False
+cyton_in = True
 
 lsl_out = False
 width = 1536
@@ -22,10 +25,10 @@ interval_duration = 0.5
 jitter = 0.1
 
 # modify!!!
-session = 1
-subject = 1
+session = 0
+subject = 0
 trial_person = '1'
-is_test = True
+is_test = False
 run = 1 # Run number, it is used as the random seed for the trial sequence generation
 np.random.seed(run)
 
@@ -40,13 +43,6 @@ save_file_aux = save_dir + f'aux_{n_per_class}-per-class_run-{run}.npy'
 save_file_target_inds = save_dir + f'tar_inds_{n_per_class}-per-class_run-{run}.txt'
 save_file_markers = save_dir + f'markers_{n_per_class}-per-class_run-{run}.npy'
 save_file_timestamp = save_dir + f'timestamp_{n_per_class}-per-class_run-{run}.npy'
-# save_file_metadata = save_dir + f'metadata_{n_per_class}-per-class_run-{run}.npy'
-
-import string
-import numpy as np
-import psychopy.visual
-import psychopy.event
-from psychopy import core
 
 keyboard = keyboard.Keyboard()
 window = visual.Window(
@@ -106,12 +102,12 @@ with open(save_file_target_inds, "w") as f:
 
 if cyton_in:
     import glob, sys, time, serial
-    from brainflow.board_shim import BoardShim, BrainFlowInputParams
+    from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
     from serial import Serial
     from threading import Thread, Event
     from queue import Queue
     sampling_rate = 250
-    CYTON_BOARD_ID = 0 # 0 if no daisy 2 if use daisy board, 6 if using daisy+wifi shield
+    CYTON_BOARD_ID = BoardIds.SYNTHETIC_BOARD.value
     BAUD_RATE = 115200
     ANALOGUE_MODE = '/2' # Reads from analog pins A5(D11), A6(D12) and if no 
                         # wifi shield is present, then A7(D13) as well.
@@ -150,34 +146,23 @@ if cyton_in:
         else:
             return openbci_port
         
-    print(BoardShim.get_board_descr(CYTON_BOARD_ID))
     params = BrainFlowInputParams()
-    if CYTON_BOARD_ID != 6:
-        params.serial_port = find_openbci_port()
-    elif CYTON_BOARD_ID == 6:
-        params.ip_port = 9000
     board = BoardShim(CYTON_BOARD_ID, params)
     board.prepare_session()
-    res_query = board.config_board('/0')
-    print(res_query)
-    res_query = board.config_board('//')
-    print(res_query)
-    res_query = board.config_board(ANALOGUE_MODE)
-    print(res_query)
     board.start_stream(45000)
     stop_event = Event()
     
     def get_data(queue_in, lsl_out=False):
         while not stop_event.is_set():
             data_in = board.get_board_data()
-            timestamp_in = data_in[board.get_timestamp_channel(CYTON_BOARD_ID)]
-            eeg_in = data_in[board.get_eeg_channels(CYTON_BOARD_ID)]
-            aux_in = data_in[board.get_analog_channels(CYTON_BOARD_ID)]
-            marker_in = data_in[board.get_marker_channel(CYTON_BOARD_ID)]
+            # timestamp_in = data_in[board.get_timestamp_channel(CYTON_BOARD_ID)]
+            # eeg_in = data_in[board.get_eeg_channels(CYTON_BOARD_ID)]
+            # aux_in = data_in[board.get_analog_channels(CYTON_BOARD_ID)]
+            # marker_in = data_in[board.get_marker_channel(CYTON_BOARD_ID)]
 
-            if len(timestamp_in) > 0:
-                print('queue-in: ', eeg_in.shape, aux_in.shape, timestamp_in.shape)
-                queue_in.put((eeg_in, aux_in, timestamp_in, marker_in))
+            # if len(timestamp_in) > 0:
+            #     print('queue-in: ', eeg_in.shape, aux_in.shape, timestamp_in.shape)
+            #     queue_in.put((eeg_in, aux_in, timestamp_in, marker_in))
             time.sleep(0.1)
     
     queue_in = Queue()
@@ -210,10 +195,10 @@ if recording_mode:
         # set the marker value fr the current trial onlt if cyton_in is True
         if cyton_in:
             if str(image_array[i_trial]) in targets:
-                marker_val = 2
-            else:
                 marker_val = 1
-            window.callOnFlip(board.insert_marker, marker_val)
+            else:
+                marker_val = 0
+            # window.callOnFlip(board.insert_marker, marker_val)
 
         for i_frame in range(num_frames):
             next_flip = window.getFutureFlipTime()
@@ -225,31 +210,31 @@ if recording_mode:
 
             keys = keyboard.getKeys()
             if 'escape' in keys:
-                if cyton_in:
+                    if cyton_in:
 
-                    stop_event.set()
-                    cyton_thread.join() # Wait for the Cyton thread to finish
+                        stop_event.set()
+                        cyton_thread.join() # Wait for the Cyton thread to finish
 
-                    while not queue_in.empty(): # Collect all data from the queue
-                        eeg_in, aux_in, timestamp_in, marker_in = queue_in.get()
-                        print('data-in: ', eeg_in.shape, aux_in.shape, timestamp_in.shape)
-                        eeg = np.concatenate((eeg, eeg_in), axis=1)
-                        aux = np.concatenate((aux, aux_in), axis=1)
-                        timestamp = np.concatenate((timestamp, timestamp_in), axis=0)
-                        marker = np.concatenate((marker, marker_in), axis=0)
+                        while not queue_in.empty(): # Collect all data from the queue
+                            eeg_in, aux_in, timestamp_in, marker_in = queue_in.get()
+                            print('data-in: ', eeg_in.shape, aux_in.shape, timestamp_in.shape)
+                            eeg = np.concatenate((eeg, eeg_in), axis=1)
+                            aux = np.concatenate((aux, aux_in), axis=1)
+                            timestamp = np.concatenate((timestamp, timestamp_in), axis=0)
+                            marker = np.concatenate((marker, marker_in), axis=0)
 
-                    os.makedirs(save_dir, exist_ok=True)
-                    np.save(save_file_eeg, eeg)
-                    np.save(save_file_aux, aux)
-                    np.save(save_file_timestamp, timestamp)
-                    np.save(save_file_markers, marker)
+                        os.makedirs(save_dir, exist_ok=True)
+                        np.save(save_file_eeg, eeg)
+                        np.save(save_file_aux, aux)
+                        np.save(save_file_timestamp, timestamp)
+                        np.save(save_file_markers, marker)
 
-                    board.stop_stream()
-                    board.release_session()
+                        board.stop_stream()
+                        board.release_session()
 
-                    del board
+                        del board
 
-                core.quit()
+                    core.quit()
 
             trial_text.draw()
             image_stim.draw()
@@ -274,7 +259,7 @@ if recording_mode:
                 aux = np.concatenate((aux, aux_in), axis=1)
                 timestamp = np.concatenate((timestamp, timestamp_in), axis=0)
                 marker = np.concatenate((marker, marker_in), axis=0)
-                # photo_trigger = (aux[1] > 20).astype(int)
+            # photo_trigger = (aux[1] > 20).astype(int)
 
     if cyton_in:
 
