@@ -1,0 +1,2 @@
+[68, 72, 45, 17, 51, 20, 87, 23, 27, 61]
+[np.str_('target\\1\\14.png'), np.str_('target\\1\\10.png'), np.str_('target\\1\\13.png'), np.str_('target\\1\\18.png'), np.str_('target\\1\\17.png'), np.str_('target\\1\\16.PNG'), np.str_('target\\1\\12.png'), np.str_('target\\1\\19.png'), np.str_('target\\1\\15.PNG'), np.str_('target\\1\\11.PNG')]
